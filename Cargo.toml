@@ -1,0 +1,22 @@
+[package]
+name = "embedded-sensors"
+version = "0.1.0"
+authors = ["Dimitri Popov <d.popov28@protonmail.ch>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["ak8963", "mpu925x", "mpu6500", "ublox"]
+ak8963 = ["nalgebra"]
+mpu925x = ["ahrs", "ak8963", "mpu6500"]
+mpu6500 = ["nalgebra"]
+ublox = ["nmea0183"]
+
+[dependencies]
+embedded-hal = "0.2.4"
+nb = "1.0.0"
+
+ahrs = { version = "0.3.0", default-features = false, optional = true }
+nalgebra = { version = "0.21.0", default-features = false, optional = true }
+nmea0183 = { version = "0.2.3", optional = true }
