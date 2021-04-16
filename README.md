@@ -21,6 +21,7 @@ embedded-sensors = { version = "0.1.0", default-features = false, features = ["m
 | Feature       | Sensors           |
 | ------------- |:-----------------:|
 | ak8963        | AK8963 |
+| bh1750        | BH1750 |
 | mpu6500       | MPU6500 |
 | mpu925x       | MPU9250 |
 | ublox         | NEO-6M |

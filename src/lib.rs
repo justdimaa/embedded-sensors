@@ -3,6 +3,9 @@
 #[cfg(feature = "ak8963")]
 pub mod ak8963;
 
+#[cfg(feature = "bh1750")]
+pub mod bh1750;
+
 #[cfg(feature = "mpu925x")]
 pub mod mpu925x;
 
