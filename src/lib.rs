@@ -6,6 +6,9 @@ pub mod ak8963;
 #[cfg(feature = "bh1750")]
 pub mod bh1750;
 
+#[cfg(feature = "e32")]
+pub mod e32;
+
 #[cfg(feature = "mpu925x")]
 pub mod mpu925x;
 

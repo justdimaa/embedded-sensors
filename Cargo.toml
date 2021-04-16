@@ -6,14 +6,15 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/niiyachiru/embedded-sensors"
 description = "Sensors in one place, with only one feature away."
-keywords = ["ak8963", "bh1750", "mpu9250", "mpu6500", "ublox"]
+keywords = ["ak8963", "bh1750", "e32", "mpu9250", "mpu6500", "ublox"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["ak8963", "bh1750", "mpu925x", "mpu6500", "ublox"]
+default = ["ak8963", "bh1750", "e32", "mpu925x", "mpu6500", "ublox"]
 ak8963 = ["nalgebra"]
 bh1750 = []
+e32 = ["heapless"]
 mpu925x = ["ahrs", "ak8963", "mpu6500"]
 mpu6500 = ["nalgebra"]
 ublox = ["nmea0183"]
@@ -23,5 +24,6 @@ embedded-hal = "0.2.4"
 nb = "1.0.0"
 
 ahrs = { version = "0.3.0", default-features = false, optional = true }
+heapless = { version = "0.6.1", optional = true }
 nalgebra = { version = "0.21.0", default-features = false, optional = true }
 nmea0183 = { version = "0.2.3", optional = true }
