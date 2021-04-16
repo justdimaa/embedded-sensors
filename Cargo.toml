@@ -1,11 +1,12 @@
 [package]
 name = "embedded-sensors"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Dimitri Popov <d.popov28@protonmail.ch>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/niiyachiru/embedded-sensors"
 description = "Sensors in one place, with only one feature away."
+keywords = ["ak8963", "bh1750", "mpu9250", "mpu6500", "ublox"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
