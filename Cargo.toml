@@ -10,8 +10,9 @@ description = "Sensors in one place, with only one feature away."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["ak8963", "mpu925x", "mpu6500", "ublox"]
+default = ["ak8963", "bh1750", "mpu925x", "mpu6500", "ublox"]
 ak8963 = ["nalgebra"]
+bh1750 = []
 mpu925x = ["ahrs", "ak8963", "mpu6500"]
 mpu6500 = ["nalgebra"]
 ublox = ["nmea0183"]
