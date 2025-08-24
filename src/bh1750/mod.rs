@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use embedded_hal::blocking::i2c;
+use embedded_hal::i2c;
 
 use self::{
     config::{Config, MeasurementMode},
@@ -11,18 +11,21 @@ pub mod config;
 mod register;
 pub mod result;
 
-pub struct Bh1750<I2C> {
+pub struct Bh1750<I2C>
+where
+    I2C: i2c::I2c,
+{
     addr: u8,
     cfg: Config,
     light_level: f32,
     _i2c: PhantomData<I2C>,
 }
 
-impl<I2C, I2cError> Bh1750<I2C>
+impl<I2C> Bh1750<I2C>
 where
-    I2C: i2c::Read<Error = I2cError> + i2c::Write<Error = I2cError>,
+    I2C: i2c::I2c,
 {
-    pub fn new(addr: u8, i2c: &mut I2C) -> Result<Self, Error<I2cError>> {
+    pub fn new(addr: u8, i2c: &mut I2C) -> Result<Self, Error<I2C::Error>> {
         Self::with_configuration(addr, i2c, Config::default())
     }
 
@@ -30,7 +33,7 @@ where
         addr: u8,
         i2c: &mut I2C,
         cfg: Config,
-    ) -> Result<Self, Error<I2cError>> {
+    ) -> Result<Self, Error<I2C::Error>> {
         let mut bh = Self {
             addr,
             cfg,
@@ -43,7 +46,7 @@ where
         Ok(bh)
     }
 
-    fn init(&mut self, i2c: &mut I2C) -> Result<(), Error<I2cError>> {
+    fn init(&mut self, i2c: &mut I2C) -> Result<(), Error<I2C::Error>> {
         self.set_measurement_mode(i2c, self.cfg.measurement_mode)?;
         self.set_measurement_time(i2c, self.cfg.measurement_time)?;
         Ok(())
@@ -57,7 +60,7 @@ where
         &mut self,
         i2c: &mut I2C,
         measurement_mode: MeasurementMode,
-    ) -> Result<(), Error<I2cError>> {
+    ) -> Result<(), Error<I2C::Error>> {
         Self::write_register(self.addr, i2c, measurement_mode as u8)?;
         self.cfg.measurement_mode = measurement_mode;
         Ok(())
@@ -71,7 +74,7 @@ where
         &mut self,
         i2c: &mut I2C,
         measurement_time: u8,
-    ) -> Result<(), Error<I2cError>> {
+    ) -> Result<(), Error<I2C::Error>> {
         if measurement_time < 31 || measurement_time > 254 {
             return Err(Error::InvalidMeasurementTime(measurement_time));
         }
@@ -90,7 +93,7 @@ where
         self.light_level
     }
 
-    pub fn read(&mut self, i2c: &mut I2C) -> Result<(), Error<I2cError>> {
+    pub fn read(&mut self, i2c: &mut I2C) -> Result<(), Error<I2C::Error>> {
         let mut buf = [0; 2];
 
         Self::read_register(self.addr, i2c, self.cfg.measurement_mode as u8, &mut buf)?;
@@ -118,7 +121,7 @@ where
         i2c: &mut I2C,
         reg: u8,
         buf: &mut [u8],
-    ) -> Result<(), Error<I2cError>> {
+    ) -> Result<(), Error<I2C::Error>> {
         match i2c.write(addr, &[reg as u8]) {
             Ok(()) => {}
             Err(e) => return Err(Error::I2cError(e)),
@@ -130,7 +133,7 @@ where
         }
     }
 
-    fn write_register(addr: u8, i2c: &mut I2C, reg: u8) -> Result<(), Error<I2cError>> {
+    fn write_register(addr: u8, i2c: &mut I2C, reg: u8) -> Result<(), Error<I2C::Error>> {
         match i2c.write(addr, &[reg]) {
             Ok(()) => Ok(()),
             Err(e) => Err(Error::I2cError(e)),

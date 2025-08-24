@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
 
+use ahrs::AhrsError;
 use config::Config;
-use embedded_hal::blocking::{delay, i2c};
+use embedded_hal::{delay, i2c};
 use nalgebra::{Quaternion, Vector3};
 
 use self::result::{Error, Result};
@@ -20,7 +21,7 @@ const MAHONY_KI: f32 = 0.0;
 
 pub struct Mpu925x<I2C, AHRS>
 where
-    I2C: i2c::Read + i2c::Write,
+    I2C: i2c::I2c,
     AHRS: ahrs::Ahrs<f32>,
 {
     ak: ak8963::Ak8963<I2C>,
@@ -29,9 +30,9 @@ where
     _i2c: PhantomData<I2C>,
 }
 
-impl<I2C, AHRS, I2cError> Mpu925x<I2C, AHRS>
+impl<I2C, AHRS> Mpu925x<I2C, AHRS>
 where
-    I2C: i2c::Read<Error = I2cError> + i2c::Write<Error = I2cError>,
+    I2C: i2c::I2c,
     AHRS: ahrs::Ahrs<f32>,
 {
     fn with_configuration_ahrs<DELAY>(
@@ -41,9 +42,9 @@ where
         delay: &mut DELAY,
         cfg: Config,
         ahrs: AHRS,
-    ) -> Result<Self, I2cError>
+    ) -> Result<Self, I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         let mpu = match mpu6500::Mpu6500::with_configuration(mpu_addr, i2c, delay, cfg.mpu) {
             Ok(v) => v,
@@ -63,7 +64,7 @@ where
         })
     }
 
-    pub fn read(&mut self, i2c: &mut I2C) -> Result<(), I2cError> {
+    pub fn read(&mut self, i2c: &mut I2C) -> Result<(), I2C::Error> {
         if let Err(e) = self.mpu.read_imu(i2c) {
             return Err(Error::Mpu6500Error(e));
         }
@@ -80,9 +81,8 @@ where
             Ok(_) => {}
             Err(e) => {
                 return match e {
-                    "Accelerometer norm divided by zero." => Err(Error::AhrsUpdateAccelerometer),
-                    "Magnetometer norm divided by zero." => Err(Error::AhrsUpdateMagnetometer),
-                    _ => unreachable!(),
+                    AhrsError::AccelerometerNormZero => Err(Error::AhrsUpdateAccelerometer),
+                    AhrsError::MagnetometerNormZero => Err(Error::AhrsUpdateMagnetometer),
                 }
             }
         }
@@ -103,18 +103,18 @@ where
     }
 }
 
-impl<I2C, I2cError> Mpu925x<I2C, Madgwick>
+impl<I2C> Mpu925x<I2C, Madgwick>
 where
-    I2C: i2c::Read<Error = I2cError> + i2c::Write<Error = I2cError>,
+    I2C: i2c::I2c,
 {
     pub fn new<DELAY>(
         ak_addr: u8,
         mpu_addr: u8,
         i2c: &mut I2C,
         delay: &mut DELAY,
-    ) -> Result<Self, I2cError>
+    ) -> Result<Self, I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         Self::with_configuration(ak_addr, mpu_addr, i2c, delay, config::Config::default())
     }
@@ -125,9 +125,9 @@ where
         i2c: &mut I2C,
         delay: &mut DELAY,
         cfg: Config,
-    ) -> Result<Self, I2cError>
+    ) -> Result<Self, I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         let sample_rate_freq = cfg.mpu.fifo_sample_rate.get_freq();
         let sample_period = sample_rate_freq as f32 / 1000.0;
@@ -142,9 +142,13 @@ where
         )
     }
 
-    pub fn calibrate_mpu<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2cError>
+    pub fn calibrate_mpu<DELAY>(
+        &mut self,
+        i2c: &mut I2C,
+        delay: &mut DELAY,
+    ) -> Result<(), I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         match self.mpu.calibrate(i2c, delay) {
             Ok(()) => Ok(()),
@@ -152,9 +156,13 @@ where
         }
     }
 
-    pub fn calibrate_ak<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2cError>
+    pub fn calibrate_ak<DELAY>(
+        &mut self,
+        i2c: &mut I2C,
+        delay: &mut DELAY,
+    ) -> Result<(), I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         match self.ak.calibrate(i2c, delay) {
             Ok(()) => Ok(()),
@@ -163,22 +171,22 @@ where
     }
 
     pub fn rotation(&self) -> Quaternion<f32> {
-        self.ahrs.quat
+        *self.ahrs.quat.quaternion()
     }
 }
 
-impl<I2C, I2cError> Mpu925x<I2C, Mahony>
+impl<I2C> Mpu925x<I2C, Mahony>
 where
-    I2C: i2c::Read<Error = I2cError> + i2c::Write<Error = I2cError>,
+    I2C: i2c::I2c,
 {
     pub fn new<DELAY>(
         ak_addr: u8,
         mpu_addr: u8,
         i2c: &mut I2C,
         delay: &mut DELAY,
-    ) -> Result<Self, I2cError>
+    ) -> Result<Self, I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         Self::with_configuration(ak_addr, mpu_addr, i2c, delay, config::Config::default())
     }
@@ -189,9 +197,9 @@ where
         i2c: &mut I2C,
         delay: &mut DELAY,
         cfg: Config,
-    ) -> Result<Self, I2cError>
+    ) -> Result<Self, I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         let sample_rate_freq = cfg.mpu.fifo_sample_rate.get_freq();
         let sample_period = sample_rate_freq as f32 / 1000.0;
@@ -207,6 +215,6 @@ where
     }
 
     pub fn rotation(&self) -> Quaternion<f32> {
-        self.ahrs.quat
+        *self.ahrs.quat.quaternion()
     }
 }

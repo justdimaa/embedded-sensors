@@ -1,13 +1,9 @@
 use core::marker::PhantomData;
 
-use embedded_hal::blocking::{delay, i2c};
+use embedded_hal::{delay, i2c};
 use nalgebra::Vector3;
 
-use self::{
-    config::Config,
-    register::Register,
-    result::{Error, Result},
-};
+use self::{config::Config, register::Register, result::Error, result::Result};
 
 pub mod config;
 mod register;
@@ -25,10 +21,7 @@ const CALIB_ACCEL_SENSITIVITY: u16 = 16384; // LSB/g
 
 const DEG_TO_RAD: f32 = 0.01745329252;
 
-pub struct Mpu6500<I2C>
-where
-    I2C: i2c::Read + i2c::Write,
-{
+pub struct Mpu6500<I2C> {
     addr: u8,
     cfg: Config,
     pub(crate) acceleration: Vector3<f32>,
@@ -41,13 +34,13 @@ where
     _i2c: PhantomData<I2C>,
 }
 
-impl<I2C, I2cError> Mpu6500<I2C>
+impl<I2C> Mpu6500<I2C>
 where
-    I2C: i2c::Read<Error = I2cError> + i2c::Write<Error = I2cError>,
+    I2C: i2c::I2c,
 {
-    pub fn new<DELAY>(addr: u8, delay: &mut DELAY, i2c: &mut I2C) -> Result<Self, I2cError>
+    pub fn new<DELAY>(addr: u8, delay: &mut DELAY, i2c: &mut I2C) -> Result<Self, I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         Self::with_configuration(addr, i2c, delay, Config::default())
     }
@@ -57,9 +50,9 @@ where
         i2c: &mut I2C,
         delay: &mut DELAY,
         cfg: Config,
-    ) -> Result<Self, I2cError>
+    ) -> Result<Self, I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         let dev_id = Self::who_am_i(addr, i2c)?;
 
@@ -85,9 +78,9 @@ where
         Ok(mpu)
     }
 
-    fn init<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2cError>
+    fn init<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         Self::pwr_mgmt_1(self.addr, i2c, false, false, false, false, false, 0x00)?;
         delay.delay_ms(100);
@@ -116,7 +109,7 @@ where
         Ok(())
     }
 
-    pub(crate) fn read_imu(&mut self, i2c: &mut I2C) -> Result<(), I2cError> {
+    pub(crate) fn read_imu(&mut self, i2c: &mut I2C) -> Result<(), I2C::Error> {
         let mut buf = [0; 14];
         Self::read_register(self.addr, i2c, Register::ACCEL_XOUT_H, &mut buf)?;
 
@@ -137,15 +130,15 @@ where
         Ok(())
     }
 
-    pub fn read(&mut self, i2c: &mut I2C) -> Result<(), I2cError> {
+    pub fn read(&mut self, i2c: &mut I2C) -> Result<(), I2C::Error> {
         self.read_imu(i2c)?;
 
         Ok(())
     }
 
-    pub fn calibrate<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2cError>
+    pub fn calibrate<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         Self::pwr_mgmt_1(self.addr, i2c, false, false, false, false, false, 0x01)?;
         Self::pwr_mgmt_2(self.addr, i2c, false, false, false, false, false, false)?;
@@ -276,7 +269,7 @@ where
         addr: u8,
         i2c: &mut I2C,
         gyro_offset: Vector3<i16>,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         let x = gyro_offset.x.to_be_bytes();
         Self::write_register(addr, i2c, Register::XG_OFFSET_H, x[0])?;
         Self::write_register(addr, i2c, Register::XG_OFFSET_L, x[1])?;
@@ -297,7 +290,7 @@ where
         addr: u8,
         i2c: &mut I2C,
         smplrt_div: config::FifoSampleRate,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         Self::write_register(addr, i2c, Register::SMPLRT_DIV, smplrt_div as u8)
     }
 
@@ -307,7 +300,7 @@ where
         i2c: &mut I2C,
         fifo_mode: bool,
         dlpf_cfg: config::GyroDlpfCfg,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         Self::write_register(
             addr,
             i2c,
@@ -322,7 +315,7 @@ where
         i2c: &mut I2C,
         gyro_fs_sel: config::GyroFullScaleSelect,
         fchoice_b: u8,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         let mut c = [0; 1];
         Self::read_register(addr, i2c, Register::GYRO_CONFIG, &mut c)?;
 
@@ -339,7 +332,7 @@ where
         addr: u8,
         i2c: &mut I2C,
         accel_fs_sel: config::AccelFullScaleSelect,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         let mut c = [0; 1];
         Self::read_register(addr, i2c, Register::ACCEL_CONFIG_2, &mut c)?;
 
@@ -357,7 +350,7 @@ where
         i2c: &mut I2C,
         accel_fchoice_b: bool,
         a_dlpf_cfg: config::AccelDlpfCfg,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         let mut c = [0; 1];
         Self::read_register(addr, i2c, Register::ACCEL_CONFIG_2, &mut c)?;
 
@@ -381,7 +374,7 @@ where
         slv_2: bool,
         slv_1: bool,
         slv_0: bool,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         Self::write_register(
             addr,
             i2c,
@@ -406,7 +399,7 @@ where
         slv_3_fifo_en: bool,
         i2c_mst_p_nsr: bool,
         i2c_mst_clk: u8,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         Self::write_register(
             addr,
             i2c,
@@ -430,7 +423,7 @@ where
         actl_fsync: bool,
         fsync_int_mode_en: bool,
         bypass_en: bool,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         Self::write_register(
             addr,
             i2c,
@@ -453,7 +446,7 @@ where
         fifo_overflow_en: bool,
         fsync_int_en: bool,
         raw_rdy_en: bool,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         Self::write_register(
             addr,
             i2c,
@@ -475,7 +468,7 @@ where
         fifo_rst: bool,
         i2c_mst_rst: bool,
         sig_cond_rst: bool,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         Self::write_register(
             addr,
             i2c,
@@ -499,7 +492,7 @@ where
         gyro_standby: bool,
         pd_ptat: bool,
         clksel: u8,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         Self::write_register(
             addr,
             i2c,
@@ -523,7 +516,7 @@ where
         disable_xg: bool,
         disable_yg: bool,
         disable_zg: bool,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         Self::write_register(
             addr,
             i2c,
@@ -538,14 +531,14 @@ where
     }
 
     /// Register 114 – FIFO Count High
-    fn fifo_count_h(addr: u8, i2c: &mut I2C) -> Result<u16, I2cError> {
+    fn fifo_count_h(addr: u8, i2c: &mut I2C) -> Result<u16, I2C::Error> {
         let mut buf = [0; 2];
         Self::read_register(addr, i2c, Register::FIFO_COUNTH, &mut buf)?;
         Ok(u16::from_be_bytes(buf))
     }
 
     /// Register 116 – FIFO Read Write
-    fn fifo_read(addr: u8, i2c: &mut I2C) -> Result<(Vector3<i16>, Vector3<i16>), I2cError> {
+    fn fifo_read(addr: u8, i2c: &mut I2C) -> Result<(Vector3<i16>, Vector3<i16>), I2C::Error> {
         let mut buf = [0; 12];
         Self::read_register(addr, i2c, Register::FIFO_R_W, &mut buf)?;
         Ok((
@@ -563,14 +556,14 @@ where
     }
 
     /// Register 117 – Who Am I
-    fn who_am_i(addr: u8, i2c: &mut I2C) -> Result<u8, I2cError> {
+    fn who_am_i(addr: u8, i2c: &mut I2C) -> Result<u8, I2C::Error> {
         let mut buf = [0; 1];
         Self::read_register(addr, i2c, Register::WHO_AM_I, &mut buf)?;
         Ok(buf[0])
     }
 
     /// Registers 119, 120, 122, 123, 125, 126 – Accelerometer Offset Registers
-    fn read_accel_offset(addr: u8, i2c: &mut I2C) -> Result<Vector3<i16>, I2cError> {
+    fn read_accel_offset(addr: u8, i2c: &mut I2C) -> Result<Vector3<i16>, I2C::Error> {
         let mut buf = [0; 2];
         Self::read_register(addr, i2c, Register::XA_OFFSET_H, &mut buf)?;
         let x = i16::from_be_bytes(buf);
@@ -591,7 +584,7 @@ where
         addr: u8,
         i2c: &mut I2C,
         accel_offset: Vector3<i16>,
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         let x = accel_offset.x.to_be_bytes();
         Self::write_register(addr, i2c, Register::XA_OFFSET_H, x[0])?;
         Self::write_register(addr, i2c, Register::XA_OFFSET_L, x[1])?;
@@ -612,7 +605,7 @@ where
         i2c: &mut I2C,
         reg: Register,
         buf: &mut [u8],
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         match i2c.write(addr, &[reg as u8]) {
             Ok(()) => {}
             Err(e) => return Err(Error::I2cError(e)),
@@ -624,7 +617,7 @@ where
         }
     }
 
-    fn write_register(addr: u8, i2c: &mut I2C, reg: Register, cmd: u8) -> Result<(), I2cError> {
+    fn write_register(addr: u8, i2c: &mut I2C, reg: Register, cmd: u8) -> Result<(), I2C::Error> {
         match i2c.write(addr, &[reg as u8, cmd]) {
             Ok(()) => Ok(()),
             Err(e) => Err(Error::I2cError(e)),

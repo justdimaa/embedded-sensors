@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use embedded_hal::blocking::{delay, i2c};
+use embedded_hal::{delay, i2c};
 use nalgebra::Vector3;
 
 use self::{
@@ -18,7 +18,7 @@ pub const DEV_ID: u8 = 0x48;
 
 pub struct Ak8963<I2C>
 where
-    I2C: i2c::Read + i2c::Write,
+    I2C: i2c::I2c,
 {
     addr: u8,
     cfg: Config,
@@ -30,13 +30,13 @@ where
     _i2c: PhantomData<I2C>,
 }
 
-impl<I2C, I2cError> Ak8963<I2C>
+impl<I2C> Ak8963<I2C>
 where
-    I2C: i2c::Read<Error = I2cError> + i2c::Write<Error = I2cError>,
+    I2C: i2c::I2c,
 {
-    pub fn new<DELAY>(addr: u8, delay: &mut DELAY, i2c: &mut I2C) -> Result<Self, I2cError>
+    pub fn new<DELAY>(addr: u8, delay: &mut DELAY, i2c: &mut I2C) -> Result<Self, I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         Self::with_configuration(addr, i2c, delay, Config::default())
     }
@@ -46,9 +46,9 @@ where
         i2c: &mut I2C,
         delay: &mut DELAY,
         cfg: Config,
-    ) -> Result<Self, I2cError>
+    ) -> Result<Self, I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         let dev_id = Self::who_am_i(addr, i2c)?;
 
@@ -72,9 +72,9 @@ where
         Ok(ak)
     }
 
-    fn init<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2cError>
+    fn init<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         Self::write_register(self.addr, i2c, Register::CNTL, 0x00)?; // shutdown
         delay.delay_ms(10);
@@ -105,7 +105,7 @@ where
         Ok(())
     }
 
-    pub fn read(&mut self, i2c: &mut I2C) -> Result<(), I2cError> {
+    pub fn read(&mut self, i2c: &mut I2C) -> Result<(), I2C::Error> {
         let raw = Self::read_raw(self.addr, i2c)?;
 
         let bias_to_current_bias =
@@ -126,9 +126,9 @@ where
         Ok(())
     }
 
-    pub fn calibrate<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2cError>
+    pub fn calibrate<DELAY>(&mut self, i2c: &mut I2C, delay: &mut DELAY) -> Result<(), I2C::Error>
     where
-        DELAY: delay::DelayMs<u16>,
+        DELAY: delay::DelayNs,
     {
         let output_bits = self.cfg.output_bits;
 
@@ -192,7 +192,7 @@ where
         self.magnetic_field
     }
 
-    fn read_raw(addr: u8, i2c: &mut I2C) -> Result<Vector3<i16>, I2cError> {
+    fn read_raw(addr: u8, i2c: &mut I2C) -> Result<Vector3<i16>, I2C::Error> {
         let mut buf = [0; 1];
         Self::read_register(addr, i2c, Register::ST1, &mut buf)?;
 
@@ -214,7 +214,7 @@ where
         ))
     }
 
-    fn who_am_i(addr: u8, i2c: &mut I2C) -> Result<u8, I2cError> {
+    fn who_am_i(addr: u8, i2c: &mut I2C) -> Result<u8, I2C::Error> {
         let mut buf = [0; 1];
         Self::read_register(addr, i2c, Register::WIA, &mut buf)?;
         Ok(buf[0])
@@ -225,7 +225,7 @@ where
         i2c: &mut I2C,
         reg: Register,
         buf: &mut [u8],
-    ) -> Result<(), I2cError> {
+    ) -> Result<(), I2C::Error> {
         match i2c.write(addr, &[reg as u8]) {
             Ok(()) => {}
             Err(e) => return Err(Error::I2cError(e)),
@@ -237,7 +237,7 @@ where
         }
     }
 
-    fn write_register(addr: u8, i2c: &mut I2C, reg: Register, cmd: u8) -> Result<(), I2cError> {
+    fn write_register(addr: u8, i2c: &mut I2C, reg: Register, cmd: u8) -> Result<(), I2C::Error> {
         match i2c.write(addr, &[reg as u8, cmd]) {
             Ok(()) => Ok(()),
             Err(e) => Err(Error::I2cError(e)),
